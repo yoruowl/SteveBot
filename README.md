@@ -1,4 +1,4 @@
-this is a bot for scraping all of the messages for a specified user in a specified discord server
+this is a bot for scraping all of the messages for a specified user in a specified discord server and outputting it into a file friendly for finetuning an LLM
 
 how to run your own instance:
 - go to https://discord.com/developers/applications
