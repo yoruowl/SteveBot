@@ -4,6 +4,7 @@ import asyncio
 import os
 from dotenv import load_dotenv
 import json
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -17,6 +18,44 @@ OUTPUT_FILE = 'user_messages.jsonl'
 # Check if environment variables are loaded
 if not all([BOT_TOKEN, GUILD_ID, USER_ID]):
     raise ValueError("Missing required environment variables. Check your .env file.")
+
+def remove_links(text):
+    """Remove URLs and links from text while preserving the rest of the content."""
+    if not text:
+        return text
+
+    # Pattern to match Discord CDN attachment URLs specifically
+    discord_cdn_pattern = r'https://cdn\.discordapp\.com/attachments/[^\s]+'
+    # Pattern to match general URLs (http, https, www)
+    url_pattern = r'https?://(?:[-\w.])+(?:[:\d]+)?(?:/(?:[\w/_.])*(?:\?(?:[\w&=%.])*)?(?:#(?:\w*))?)?'
+    # Also match www. links without protocol
+    www_pattern = r'www\.(?:[-\w.])+(?:[:\d]+)?(?:/(?:[\w/_.])*(?:\?(?:[\w&=%.])*)?(?:#(?:\w*))?)?'
+
+    # Remove Discord CDN URLs first (most specific)
+    cleaned_text = re.sub(discord_cdn_pattern, '', text)
+    # Remove general URLs
+    cleaned_text = re.sub(url_pattern, '', cleaned_text)
+    # Remove www links
+    cleaned_text = re.sub(www_pattern, '', cleaned_text)
+
+    # Remove attachment placeholder text that's left behind
+    # Remove "Attachments:" lines
+    cleaned_text = re.sub(r'\n?\s*Attachments:\s*\n?', '', cleaned_text)
+    # Remove standalone "Attachments:" at start or end
+    cleaned_text = re.sub(r'^\s*Attachments:\s*$', '', cleaned_text)
+
+    # Clean up extra whitespace left by removed links and attachment text
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+
+    return cleaned_text
+
+
+def is_meaningful_message(text):
+    """Check if a message has meaningful content."""
+    if not text or not text.strip():
+        return False
+
+    return True
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -53,7 +92,8 @@ async def on_ready():
                         if message.attachments:
                             urls = ", ".join([att.url for att in message.attachments])
                             completion += f'\nAttachments: {urls}'
-                        if completion.strip():  # Skip empty messages
+                        completion = remove_links(completion)  # Remove links from final completion including attachments
+                        if is_meaningful_message(completion):  # Skip messages that are just attachment placeholders
                             msg_dict = {
                                 "prompt": SYSTEM_PROMPT,
                                 "completion": completion
